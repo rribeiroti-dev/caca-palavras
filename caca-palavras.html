@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Caça-Palavras</title>
+    <style>
+        :root {
+            --bg-color: #1a1a2e;
+            --cell-bg: #16213e;
+            --highlight: #e94560;
+            --text-color: #f5f5f5;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 10px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 768px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .screen {
+            display: none;
+            width: 100%;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .screen.active {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        h1, h2, h3 {
+            text-align: center;
+            color: var(--highlight);
+        }
+
+        /* Formulários */
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        input, select, button {
+            padding: 12px;
+            border-radius: 8px;
+            border: none;
+            font-size: 16px;
+            background: #2a2a4a;
+            color: white;
+            outline: none;
+        }
+
+        button {
+            background: var(--highlight);
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        button:active {
+            opacity: 0.8;
+        }
+        
+        button.danger {
+            background: #d9534f;
+        }
+
+        /* Cabeçalho do Jogo */
+        .game-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--cell-bg);
+            padding: 10px 15px;
+            border-radius: 8px;
+        }
+
+        .progress-bar-container {
+            width: 100%;
+            height: 10px;
+            background: #2a2a4a;
+            border-radius: 5px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: var(--highlight);
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        /* Tabuleiro */
+        .board-container {
+            display: flex;
+            justify-content: center;
+            width: 100%;
+            touch-action: none; /* Previne scroll no mobile durante o toque */
+        }
+
+        .board {
+            display: grid;
+            gap: 2px;
+            background: #0f0f1a;
+            padding: 2px;
+            border-radius: 8px;
+            max-width: 100%;
+        }
+
+        .cell {
+            background: var(--cell-bg);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            font-size: 14px;
+            color: #ddd;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background 0.15s, transform 0.1s;
+            width: 32px;
+            height: 32px;
+        }
+
+        @media (min-width: 500px) {
+            .cell {
+                width: 40px;
+                height: 40px;
+                font-size: 20px;
+            }
+        }
+
+        .cell.selected {
+            background: var(--highlight) !important;
+            color: white;
+        }
+
+        .cell.found {
+            color: white;
+            animation: pulse 0.3s;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        /* Lista de Palavras */
+        .word-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            background: var(--cell-bg);
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .word-item {
+            padding: 5px 10px;
+            border-radius: 15px;
+            background: #2a2a4a;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.3s;
+        }
+
+        .word-item.found {
+            text-decoration: line-through;
+            opacity: 0.6;
+        }
+
+        /* Ranking */
+        .ranking-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        
+        .ranking-table th, .ranking-table td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #2a2a4a;
+        }
+
+        .ranking-table tr.current-player {
+            background: rgba(233, 69, 96, 0.2);
+            font-weight: bold;
+        }
+
+        /* Modal Fim de Partida */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .modal {
+            background: var(--bg-color);
+            padding: 20px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+            border: 2px solid var(--highlight);
+        }
+
+        .modal h2 { margin-bottom: 15px; }
+        .modal p { margin-bottom: 10px; font-size: 18px; }
+        .modal button { width: 100%; margin-top: 15px; }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- TELA 1: SETUP -->
+        <div id="screen-setup" class="screen active">
+            <h1>Caça-Palavras</h1>
+            <div class="form-group">
+                <label for="playerName">Nome do jogador</label>
+                <input type="text" id="playerName" placeholder="Digite seu nome" required>
+            </div>
+            <div class="form-group">
+                <label for="playerAge">Idade do jogador</label>
+                <input type="number" id="playerAge" min="5" max="99" placeholder="Sua idade (5-99)" required>
+            </div>
+            <div class="form-group">
+                <label for="difficulty">Dificuldade</label>
+                <select id="difficulty">
+                    <option value="easy">Fácil (6 palavras / 3 min)</option>
+                    <option value="medium">Moderado (10 palavras / 4 min)</option>
+                    <option value="hard">Difícil (15 palavras / 5 min)</option>
+                </select>
+            </div>
+            <button onclick="startGame()">Iniciar Jogo</button>
+            <button onclick="showRankingScreen()" style="background: #2a2a4a">Ver Ranking</button>
+        </div>
+
+        <!-- TELA 2: JOGO -->
+        <div id="screen-game" class="screen">
+            <div class="game-header">
+                <div>
+                    <strong id="scoreDisplay">Pontos: 0</strong>
+                </div>
+                <div>
+                    ⏱ <strong id="timeDisplay">00:00</strong>
+                </div>
+            </div>
+            <div>
+                <div style="display:flex; justify-content:space-between; font-size: 12px;">
+                    <span>Progresso das Palavras</span>
+                    <span id="progressText">0/0</span>
+                </div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar" id="progressBar"></div>
+                </div>
+            </div>
+
+            <div class="board-container">
+                <div id="board" class="board"></div>
+            </div>
+
+            <div id="wordList" class="word-list"></div>
+        </div>
+
+        <!-- TELA 3: RANKING -->
+        <div id="screen-ranking" class="screen">
+            <h2>Ranking Geral (Top 10)</h2>
+            <div style="overflow-x: auto;">
+                <table class="ranking-table" id="rankingTable">
+                    <thead>
+                        <tr>
+                            <th>Pos</th>
+                            <th>Nome</th>
+                            <th>Pts</th>
+                            <th>Tempo</th>
+                            <th>Dif.</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <button onclick="returnToSetup()">Voltar ao Início</button>
+            <button onclick="clearRanking()" class="danger">Limpar Ranking</button>
+        </div>
+    </div>
+
+    <!-- MODAL RESULTADO -->
+    <div id="endModal" class="modal-overlay">
+        <div class="modal">
+            <h2 id="endTitle">Fim de Jogo!</h2>
+            <p>Pontuação Final: <strong id="endScore" style="color:var(--highlight)">0</strong></p>
+            <p>Tempo Gasto: <strong id="endTime">00:00</strong></p>
+            <p>Palavras: <strong id="endWords">0/0</strong></p>
+            <button onclick="closeModalAndShowRanking()">Ver Ranking</button>
+        </div>
+    </div>
+
+    <script>
+        // BANCO DE PALAVRAS (Sem acentos/caracteres especiais)
+        const wordBanks = {
+            '5-9': ['MACA', 'GATO', 'AZUL', 'BOLO', 'SOL', 'PATO', 'UVA', 'COR', 'FOGO', 'LEAO', 'SAPO', 'BOLA', 'CASA', 'LUA', 'DOCE'],
+            '10-13': ['BRASIL', 'FUTEBOL', 'CANETA', 'CADERNO', 'TECLADO', 'JARDIM', 'MUSICA', 'PLANETA', 'OCULOS', 'RELOGIO', 'CINEMA', 'ESCOLA', 'ESPACO', 'VIAGEM'],
+            '14-17': ['BIOLOGIA', 'INTERNET', 'ALGORITMO', 'GEOMETRIA', 'EQUACAO', 'GRAVIDADE', 'MOLECULA', 'SISTEMA', 'NEURONIO', 'ASTRONOMIA', 'COMPUTADOR', 'GENETICA'],
+            '18+': ['FILOSOFIA', 'LITERATURA', 'PARADOXO', 'METAFORA', 'MELANCOLIA', 'REVOLUCAO', 'EXISTENCIA', 'EPIFANIA', 'RETORICA', 'SOCIOLOGIA', 'PSICOLOGIA', 'EPISTEMOLOGIA']
+        };
+
+        const difficulties = {
+            'easy': { wordCount: 6, time: 180, multiplier: 1, name: 'Fácil' },
+            'medium': { wordCount: 10, time: 240, multiplier: 2, name: 'Moderado' },
+            'hard': { wordCount: 15, time: 300, multiplier: 3, name: 'Difícil' }
+        };
+
+        // Paleta de cores para destaque das palavras encontradas
+        const foundColors = ['#f39c12', '#27ae60', '#8e44ad', '#2980b9', '#16a085', '#d35400', '#c0392b', '#1abc9c', '#3498db', '#9b59b6'];
+
+        // ESTADO GLOBAL DO JOGO
+        let gameState = {
+            playerName: '',
+            difficultyKey: '',
+            multiplier: 1,
+            grid: [],
+            size: 0,
+            wordsToFind: [],
+            foundWords: [],
+            score: 0,
+            timeRemaining: 0,
+            timer: null,
+            isSelecting: false,
+            startCell: null,
+            currentSelection: [],
+            wordColors: {} // Mapeia palavra para sua cor de destaque
+        };
+
+        // NAVEGAÇÃO DE TELAS
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        // FLUXO DE INICIALIZAÇÃO
+        function startGame() {
+            const nameInput = document.getElementById('playerName').value.trim();
+            const ageInput = parseInt(document.getElementById('playerAge').value);
+            const diffInput = document.getElementById('difficulty').value;
+
+            if (!nameInput) { alert("Preencha seu nome!"); return; }
+            if (isNaN(ageInput) || ageInput < 5 || ageInput > 99) { alert("Idade inválida (5 a 99 anos)!"); return; }
+
+            // Definir faixa etária
+            let ageCategory = '18+';
+            if (ageInput <= 9) ageCategory = '5-9';
+            else if (ageInput <= 13) ageCategory = '10-13';
+            else if (ageInput <= 17) ageCategory = '14-17';
+
+            const diff = difficulties[diffInput];
+            
+            // Embaralhar e selecionar palavras do banco
+            let availableWords = [...wordBanks[ageCategory]];
+            availableWords.sort(() => 0.5 - Math.random());
+            
+            const wordsCount = Math.min(diff.wordCount, availableWords.length);
+            const selectedWords = availableWords.slice(0, wordsCount).map(w => w.toUpperCase());
+
+            // Regra do tamanho: minimo (palavras+4)x(palavras+4), maximo 20x20
+            const size = Math.min(Math.max(wordsCount + 4, 10), 20);
+
+            // Reiniciar estado
+            gameState = {
+                playerName: nameInput,
+                difficultyKey: diffInput,
+                multiplier: diff.multiplier,
+                size: size,
+                grid: Array.from({length: size}, () => Array(size).fill('')),
+                wordsToFind: selectedWords,
+                foundWords: [],
+                score: 0,
+                timeRemaining: diff.time,
+                isSelecting: false,
+                startCell: null,
+                currentSelection: [],
+                wordColors: {}
+            };
+
+            generateBoard(selectedWords, size);
+            renderGame();
+            
+            clearInterval(gameState.timer);
+            gameState.timer = setInterval(updateTimer, 1000);
+            updateTimerDisplay();
+            
+            showScreen('screen-game');
+        }
+
+        // ALGORITMO DO TABULEIRO
+        function generateBoard(words, size) {
+            // Direções possíveis (Horizontal, Vertical, Diagonal)
+            const directions = [ [0, 1], [1, 0], [1, 1] ];
+
+            for (const word of words) {
+                let placed = false;
+                let attempts = 0;
+                
+                // Tenta posicionar aleatoriamente
+                while (!placed && attempts < 200) {
+                    attempts++;
+                    const dir = directions[Math.floor(Math.random() * directions.length)];
+                    const startRow = Math.floor(Math.random() * size);
+                    const startCol = Math.floor(Math.random() * size);
+
+                    if (canPlaceWord(word, startRow, startCol, dir[0], dir[1], size)) {
+                        for (let i = 0; i < word.length; i++) {
+                            gameState.grid[startRow + i * dir[0]][startCol + i * dir[1]] = word[i];
+                        }
+                        placed = true;
+                    }
+                }
+                
+                // Se falhar (edge case raro), tenta forçar o encaixe linha a linha horizontalmente
+                if(!placed) {
+                     for (let r = 0; r < size && !placed; r++) {
+                         if(canPlaceWord(word, r, 0, 0, 1, size)){
+                            for (let i = 0; i < word.length; i++) {
+                                gameState.grid[r][i] = word[i];
+                            }
+                            placed = true;
+                         }
+                     }
+                }
+            }
+
+            // Preenche o resto com letras aleatórias
+            const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            for (let r = 0; r < size; r++) {
+                for (let c = 0; c < size; c++) {
+                    if (gameState.grid[r][c] === '') {
+                        gameState.grid[r][c] = alphabet[Math.floor(Math.random() * alphabet.length)];
+                    }
+                }
+            }
+        }
+
+        function canPlaceWord(word, r, c, dr, dc, size) {
+            // Verifica se a palavra cabe nos limites
+            if (r + word.length * dr > size || c + word.length * dc > size) return false;
+            
+            // Verifica interseções
+            for (let i = 0; i < word.length; i++) {
+                const cell = gameState.grid[r + i * dr][c + i * dc];
+                if (cell !== '' && cell !== word[i]) {
+                    return false; // Colisão com letra diferente
+                }
+            }
+            return true;
+        }
+
+        // RENDERIZAÇÃO DA INTERFACE
+        function renderGame() {
+            const boardEl = document.getElementById('board');
+            boardEl.style.gridTemplateColumns = `repeat(${gameState.size}, 1fr)`;
+            boardEl.innerHTML = '';
+
+            for (let r = 0; r < gameState.size; r++) {
+                for (let c = 0; c < gameState.size; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.dataset.r = r;
+                    cell.dataset.c = c;
+                    cell.textContent = gameState.grid[r][c];
+                    
+                    // Eventos de Mouse (Desktop)
+                    cell.addEventListener('mousedown', handleStart);
+                    cell.addEventListener('mouseenter', handleMove);
+                    
+                    boardEl.appendChild(cell);
+                }
+            }
+
+            // MouseUp Global para encerrar seleção fora do grid
+            document.addEventListener('mouseup', handleEnd);
+            
+            // Eventos de Toque (Mobile) atrelados ao container para permitir arrasto contínuo
+            boardEl.addEventListener('touchstart', handleTouchStart, {passive: false});
+            boardEl.addEventListener('touchmove', handleTouchMove, {passive: false});
+            boardEl.addEventListener('touchend', handleTouchEnd);
+            boardEl.addEventListener('touchcancel', handleTouchEnd);
+
+            renderWordList();
+            updateProgress();
+        }
+
+        function renderWordList() {
+            const listEl = document.getElementById('wordList');
+            listEl.innerHTML = '';
+            gameState.wordsToFind.forEach(word => {
+                const div = document.createElement('div');
+                div.className = 'word-item';
+                div.innerHTML = `<span>${word}</span>`;
+                
+                if(gameState.foundWords.includes(word)) {
+                    div.classList.add('found');
+                    div.innerHTML = `✅ <del>${word}</del>`;
+                    div.style.background = gameState.wordColors[word];
+                }
+                listEl.appendChild(div);
+            });
+        }
+
+        function updateProgress() {
+            const found = gameState.foundWords.length;
+            const total = gameState.wordsToFind.length;
+            document.getElementById('progressText').textContent = `${found}/${total}`;
+            document.getElementById('progressBar').style.width = `${(found / total) * 100}%`;
+            document.getElementById('scoreDisplay').textContent = `Pontos: ${gameState.score}`;
+        }
+
+        // CONTROLES DE SELEÇÃO (LÓGICA)
+        function handleStart(e) {
+            if(e.type === 'mousedown' && e.button !== 0) return; // Apenas clique esquerdo
+            const r = parseInt(e.target.dataset.r);
+            const c = parseInt(e.target.dataset.c);
+            if(isNaN(r)) return;
+            
+            gameState.isSelecting = true;
+            gameState.startCell = {r, c};
+            updateSelection(r, c);
+        }
+
+        function handleMove(e) {
+            if (!gameState.isSelecting) return;
+            const r = parseInt(e.target.dataset.r);
+            const c = parseInt(e.target.dataset.c);
+            if(!isNaN(r)) updateSelection(r, c);
+        }
+
+        function handleEnd() {
+            if (!gameState.isSelecting) return;
+            gameState.isSelecting = false;
+            checkSelection();
+        }
+
+        // HANDLERS TOUCH MOBILE
+        function handleTouchStart(e) {
+            e.preventDefault(); // Previne scroll da tela
+            const touch = e.touches[0];
+            const el = document.elementFromPoint(touch.clientX, touch.clientY);
+            if(el && el.classList.contains('cell')) {
+                handleStart({target: el});
+            }
+        }
+
+        function handleTouchMove(e) {
+            e.preventDefault();
+            if (!gameState.isSelecting) return;
+            const touch = e.touches[0];
+            const el = document.elementFromPoint(touch.clientX, touch.clientY);
+            if(el && el.classList.contains('cell')) {
+                const r = parseInt(el.dataset.r);
+                const c = parseInt(el.dataset.c);
+                if(!isNaN(r)) updateSelection(r, c);
+            }
+        }
+
+        function handleTouchEnd() {
+            handleEnd();
+        }
+
+        // DESENHO DA SELEÇÃO (Somente linhas retas)
+        function updateSelection(endR, endC) {
+            const sr = gameState.startCell.r;
+            const sc = gameState.startCell.c;
+            
+            const dr = endR - sr;
+            const dc = endC - sc;
+            
+            const steps = Math.max(Math.abs(dr), Math.abs(dc));
+            
+            // Limpa selecao visual
+            document.querySelectorAll('.cell.selected').forEach(c => c.classList.remove('selected'));
+            gameState.currentSelection = [];
+
+            if (steps === 0) {
+                selectCell(sr, sc);
+                return;
+            }
+
+            // Permite apenas seleções em linha reta (horizontal, vertical ou diagonal perfeita 45º)
+            if (Math.abs(dr) !== Math.abs(dc) && dr !== 0 && dc !== 0) return;
+
+            const stepR = dr === 0 ? 0 : dr / Math.abs(dr);
+            const stepC = dc === 0 ? 0 : dc / Math.abs(dc);
+
+            for (let i = 0; i <= steps; i++) {
+                selectCell(sr + i * stepR, sc + i * stepC);
+            }
+        }
+
+        function selectCell(r, c) {
+            const el = document.querySelector(`.cell[data-r="${r}"][data-c="${c}"]`);
+            if(el) {
+                el.classList.add('selected');
+                gameState.currentSelection.push({char: gameState.grid[r][c], el});
+            }
+        }
+
+        function checkSelection() {
+            if (gameState.currentSelection.length < 2) {
+                clearSelection();
+                return;
+            }
+
+            // Checa a palavra lida de frente para trás ou de trás para frente
+            const wordForward = gameState.currentSelection.map(s => s.char).join('');
+            const wordBackward = gameState.currentSelection.slice().reverse().map(s => s.char).join('');
+            
+            let matchedWord = null;
+
+            if (gameState.wordsToFind.includes(wordForward) && !gameState.foundWords.includes(wordForward)) {
+                matchedWord = wordForward;
+            } else if (gameState.wordsToFind.includes(wordBackward) && !gameState.foundWords.includes(wordBackward)) {
+                matchedWord = wordBackward;
+            }
+
+            if (matchedWord) {
+                // Acertou a palavra
+                const color = foundColors[gameState.foundWords.length % foundColors.length];
+                gameState.foundWords.push(matchedWord);
+                gameState.wordColors[matchedWord] = color;
+                
+                // Pontuação (letras * multiplicador)
+                gameState.score += matchedWord.length * gameState.multiplier;
+                
+                // Marca as células visualmente
+                gameState.currentSelection.forEach(s => {
+                    s.el.classList.add('found');
+                    s.el.style.backgroundColor = color;
+                });
+                
+                renderWordList();
+                updateProgress();
+
+                // Checa condição de vitória
+                if (gameState.foundWords.length === gameState.wordsToFind.length) {
+                    endGame(true);
+                }
+            }
+            
+            clearSelection();
+        }
+
+        function clearSelection() {
+            document.querySelectorAll('.cell.selected').forEach(c => c.classList.remove('selected'));
+            gameState.currentSelection = [];
+        }
+
+        // SISTEMA DE TEMPO
+        function updateTimer() {
+            if (gameState.timeRemaining <= 0) {
+                endGame(false);
+                return;
+            }
+            gameState.timeRemaining--;
+            updateTimerDisplay();
+        }
+
+        function updateTimerDisplay() {
+            const m = Math.floor(gameState.timeRemaining / 60).toString().padStart(2, '0');
+            const s = (gameState.timeRemaining % 60).toString().padStart(2, '0');
+            document.getElementById('timeDisplay').textContent = `${m}:${s}`;
+            
+            // Fica vermelho nos últimos 15 segundos
+            if(gameState.timeRemaining <= 15) {
+                document.getElementById('timeDisplay').style.color = 'var(--highlight)';
+            } else {
+                document.getElementById('timeDisplay').style.color = 'var(--text-color)';
+            }
+        }
+
+        // LÓGICA DE FIM DE PARTIDA
+        function endGame(win) {
+            clearInterval(gameState.timer);
+            
+            const timeUsed = difficulties[gameState.difficultyKey].time - gameState.timeRemaining;
+            const diffName = difficulties[gameState.difficultyKey].name;
+            
+            document.getElementById('endTitle').textContent = win ? "🎉 Você Venceu!" : "⏳ Tempo Esgotado!";
+            document.getElementById('endScore').textContent = gameState.score;
+            
+            const m = Math.floor(timeUsed / 60).toString().padStart(2, '0');
+            const s = (timeUsed % 60).toString().padStart(2, '0');
+            document.getElementById('endTime').textContent = `${m}:${s}`;
+            
+            document.getElementById('endWords').textContent = `${gameState.foundWords.length} / ${gameState.wordsToFind.length}`;
+            
+            // Persistir no LocalStorage
+            saveRanking({
+                name: gameState.playerName,
+                score: gameState.score,
+                time: timeUsed,
+                difficulty: diffName,
+                date: new Date().toLocaleString('pt-BR')
+            });
+
+            // Exibir modal
+            document.getElementById('endModal').style.display = 'flex';
+        }
+
+        function closeModalAndShowRanking() {
+            document.getElementById('endModal').style.display = 'none';
+            showRankingScreen();
+        }
+
+        // LÓGICA DE RANKING (LOCAL STORAGE)
+        function getRanking() {
+            try {
+                return JSON.parse(localStorage.getItem('cacaPalavrasRanking')) || [];
+            } catch {
+                return [];
+            }
+        }
+
+        function saveRanking(entry) {
+            const ranking = getRanking();
+            ranking.push(entry);
+            // Regra de ordenação: Maior pontuação primeiro, depois menor tempo
+            ranking.sort((a, b) => {
+                if (b.score !== a.score) return b.score - a.score; // 1º critério
+                return a.time - b.time; // 2º critério
+            });
+            // Mantém apenas o Top 10
+            localStorage.setItem('cacaPalavrasRanking', JSON.stringify(ranking.slice(0, 10)));
+        }
+
+        function showRankingScreen() {
+            const ranking = getRanking();
+            const tbody = document.querySelector('#rankingTable tbody');
+            tbody.innerHTML = '';
+            
+            if (ranking.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center">Nenhum registro encontrado.</td></tr>';
+            } else {
+                ranking.forEach((r, idx) => {
+                    const m = Math.floor(r.time / 60).toString().padStart(2, '0');
+                    const s = (r.time % 60).toString().padStart(2, '0');
+                    
+                    const tr = document.createElement('tr');
+                    
+                    // Destaca jogador atual na lista (usando nome, score e tempo idênticos)
+                    if (gameState.playerName === r.name && gameState.score === r.score) {
+                        tr.className = 'current-player';
+                    }
+                    
+                    tr.innerHTML = `
+                        <td>${idx + 1}º</td>
+                        <td>${r.name}</td>
+                        <td>${r.score}</td>
+                        <td>${m}:${s}</td>
+                        <td>${r.difficulty}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+            
+            showScreen('screen-ranking');
+        }
+
+        function returnToSetup() {
+            showScreen('screen-setup');
+        }
+
+        function clearRanking() {
+            if (confirm("Você deseja limpar TODO o ranking (todas as dificuldades)? Ação irreversível!")) {
+                localStorage.removeItem('cacaPalavrasRanking');
+                showRankingScreen();
+            }
+        }
+    </script>
+</body>
+</html>
